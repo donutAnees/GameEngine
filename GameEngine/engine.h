@@ -199,6 +199,13 @@ public:
 		}
 	}
 
+	void drawTriangle(int x1, int y1, int x2, int y2, int x3, int y3, short c = 0x2588, short col = 0x000F)
+	{
+		drawLine(x1, y1, x2, y2, c, col);
+		drawLine(x2, y2, x3, y3, c, col);
+		drawLine(x3, y3, x1, y1, c, col);
+	}
+
 	// To render the screen buffer to the console
 	void render() {
 		// Write the screen buffer to the console output

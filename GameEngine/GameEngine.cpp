@@ -2,21 +2,56 @@
 //
 
 #include "engine.h"
+#include "geometry.h"
 
 class MainGame : public engine {
+private:
+	Cube cube = Cube(0,0,0,1);
 public:
 	MainGame() : engine(960, 520, 1, 1) {
 	}
 	void updateFrame() override {
-		m_console.fill(0, 0, 960, 525, PIXEL_SOLID, FG_DARK_BLUE);
-		m_console.drawLine(0, 0, 80, 80, PIXEL_SOLID, FG_WHITE);
+		m_console.fill(0, 0, 960, 520, PIXEL_SOLID, BG_BLACK);
+
+		mat4x4 matProj;
+		matProj.initProjectionMatrix(0.1f, 1000.0f, 90.0f, 520.0f / 960.0f);
+
+		for (auto& tri : cube.triangles) {
+			Triangle triProjected, triTrans;
+
+			// Rotate in 3D space
+			triTrans = tri;
+
+			float translationX = -2.5f;
+			float translationY = 0.5f;
+			float translationZ = 2.0f;
+			
+			for (int i = 0; i < 3; i++) {
+				triTrans.p[i].x += translationX;
+				triTrans.p[i].y += translationY;
+				triTrans.p[i].z += translationZ;
+			}
+
+			for (int i = 0; i < 3; i++) {
+				matProj.matrixMultiplyVector(triTrans.p[i], triProjected.p[i]);
+			}
+			// Scale into the view
+			for (int i = 0; i < 3; i++) {
+				// Normalize from [-1,1] to [0,2]
+				triProjected.p[i].x += 1.0f;
+				triProjected.p[i].y += 1.0f;
+				// Convert from [0,2] to [0,screenWidth] and [0,screenHeight]
+				triProjected.p[i].x *= 0.5f * 960.0f;
+				triProjected.p[i].y *= 0.5f * 520.0f;
+			}
+			m_console.drawTriangle(triProjected.p[0].x, triProjected.p[0].y, triProjected.p[1].x, triProjected.p[1].y, triProjected.p[2].x, triProjected.p[2].y, PIXEL_SOLID, FG_WHITE);
+		}
 	}
 };
 
 int main()
 {
 	MainGame game;
-	game.start();
 	game.start();
 	return 0;
 }
