@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <iostream>
 #include <thread>
+#include "geometry.h"
 
 enum COLOUR
 {
@@ -221,6 +222,62 @@ public:
 	}
 };
 
+class camera {
+public:
+	// This is the vector in world space that points to the camera's position.
+	vec3 m_pos;
+	// This is the vector in world space the camera is looking at, initially it is the origin (0,0,0)
+	vec3 m_target;
+	// This is the vector which gives the z direction of the camera, this is derived from the target and position
+	// Note that m_forward points to the reverse direction to where the camera is looking at
+	vec3 m_forward;
+	// This is the vector which gives the x direction of the camera, this is derived from the cross product 
+	// of up vector which points upwards in world space (0,1,0) - up, which gives us x since it is perpendicular to up and z
+	vec3 m_right;
+	// This is the vector which gives the y direction of the camera, this is derived from the cross product of x and z
+	vec3 m_up;
+	// The speed at which the camera moves
+	float m_speed;
+	camera() {
+		m_speed = 0.5f;
+		m_pos = { 0.0, 0.0, 3.0 };
+		m_target = { 0.0 , 0.0 , 0.0 };
+		updateCameraFields();
+	}
+	void setSpeed(float speed) {
+		m_speed = speed;
+	}
+	void updateCameraFields() {
+		m_forward = vec3_sub(m_target, m_pos);
+		normalize(m_forward);
+		vec3 up = { 0.0, 1.0, 0.0 };
+		m_right = cross_product(up, m_forward);
+		normalize(m_right);
+
+		m_up = cross_product(m_forward, m_right);
+	}
+	void updateCameraForward() {
+		m_pos = vec3_add(m_pos, vec3_mul(m_forward, m_speed));
+		updateCameraFields();
+	}
+	void updateCameraBackward() {
+		m_pos = vec3_sub(m_pos, vec3_mul(m_forward, m_speed));
+		updateCameraFields();
+	}
+	void updateCameraRight() {
+		vec3 cp = cross_product(m_forward, m_up);
+		normalize(cp);
+		m_pos = vec3_add(m_pos, vec3_mul(cp, m_speed));
+		updateCameraFields();
+	}
+	void updateCameraLeft() {
+		vec3 cp = cross_product(m_forward, m_up);
+		normalize(cp);
+		m_pos = vec3_sub(m_pos, vec3_mul(cp, m_speed));
+		updateCameraFields();
+	}
+};
+
 class engine {
 private:
 	static std::atomic<bool> m_engineActive;
@@ -230,12 +287,16 @@ private:
 			m_console.render();
 		}
 	}
+protected:
+	float deltaTime = 0.0f;
+	float lastFrame = 0.0f;
 public:
 	console m_console;
-	engine() : m_console() {
+	camera m_camera;
+	engine() : m_console(), m_camera() {
 	}
 
-	engine(short int width, short int height, short int fontWidth, short int fontHeight) : m_console(width, height, fontWidth, fontHeight) {
+	engine(short int width, short int height, short int fontWidth, short int fontHeight) : m_console(width, height, fontWidth, fontHeight), m_camera() {
 	}
 
 	void start() {

@@ -2,47 +2,99 @@
 //
 
 #include "engine.h"
-#include "geometry.h"
+#include <sstream>
+#include <chrono>
+#include <cmath>
+
+#define SCREEN_WIDTH 960.0f
+#define SCREEN_HEIGHT 520.0f
+
+#define DBOUT( s )            \
+{                             \
+   std::wostringstream os_;    \
+   os_ << s;                   \
+   OutputDebugString( os_.str().c_str() );  \
+}
+
+std::chrono::high_resolution_clock::time_point startTime = std::chrono::high_resolution_clock::now();
+const float radius = 20.0f;
+
+float getElapsedTime() {
+	auto now = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<float> elapsed = now - startTime;  // Time elapsed in seconds
+	return elapsed.count();
+}
 
 class MainGame : public engine {
 private:
-	Cube cube = Cube(0,0,0,1);
+	Mesh mesh;
+	Cube cube = Cube(0, 0, 0, 1);
 public:
-	MainGame() : engine(960, 520, 1, 1) {
+	MainGame() : engine(SCREEN_WIDTH, SCREEN_HEIGHT, 1, 1) {
+		DBOUT("Loading File");
+		if (!mesh.loadFromObjectFile("teapot.obj")) {
+			DBOUT("Failed to load object file" << std::endl);
+		}
 	}
 	void updateFrame() override {
-		m_console.fill(0, 0, 960, 520, PIXEL_SOLID, BG_BLACK);
+		m_console.fill(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, PIXEL_SOLID, BG_BLACK);
 
+		if (GetAsyncKeyState((unsigned short)'A') & 0x8000) {
+			m_camera.updateCameraLeft();
+		}
+
+		if (GetAsyncKeyState((unsigned short)'D') & 0x8000) {
+			m_camera.updateCameraRight();
+		}
+
+		if (GetAsyncKeyState((unsigned short)'W') & 0x8000) {
+			m_camera.updateCameraForward();
+		}
+
+		if (GetAsyncKeyState((unsigned short)'S') & 0x8000) {
+			m_camera.updateCameraBackward();
+		}
+		
+		// Print camera position to terminal
+		DBOUT("Camera Position: " << m_camera.m_pos.x << " " << m_camera.m_pos.y << " " << m_camera.m_pos.z << std::endl);
+		
 		mat4x4 matProj;
-		matProj.initProjectionMatrix(0.1f, 1000.0f, 90.0f, 520.0f / 960.0f);
+		matProj.initProjectionMatrix(0.1f, 1000.0f, 90.0f, SCREEN_HEIGHT / SCREEN_WIDTH);
 
-		for (auto& tri : cube.triangles) {
-			Triangle triProjected, triTrans;
+		// Get elapsed time since start
+		float time = getElapsedTime();
 
-			// Rotate in 3D space
-			triTrans = tri;
+		deltaTime = time - lastFrame;
+		lastFrame = time;
 
-			float translationX = -2.5f;
-			float translationY = 0.5f;
-			float translationZ = 2.0f;
-			
+		mat4x4 matView;
+		matView.initViewMatrix(m_camera.m_pos, m_camera.m_forward, m_camera.m_up, m_camera.m_right);
+
+		for (auto& tri : mesh.triangles) {
+			tri.computeNormal();
+
+			// We need to hide the triangles which are away from the camera, this can be done by
+			// getting the dot product of the normal of the triangle and the vector from the camera to the triangle
+			// If the dot product is negative, then the triangle is facing towards the camera, else it is facing away
+
+			Triangle triProjected, triView;
+
 			for (int i = 0; i < 3; i++) {
-				triTrans.p[i].x += translationX;
-				triTrans.p[i].y += translationY;
-				triTrans.p[i].z += translationZ;
+				matView.matrixMultiplyVector(tri.p[i], triView.p[i]);
 			}
 
 			for (int i = 0; i < 3; i++) {
-				matProj.matrixMultiplyVector(triTrans.p[i], triProjected.p[i]);
+				matProj.matrixMultiplyVector(triView.p[i], triProjected.p[i]);
 			}
+	
 			// Scale into the view
 			for (int i = 0; i < 3; i++) {
 				// Normalize from [-1,1] to [0,2]
 				triProjected.p[i].x += 1.0f;
 				triProjected.p[i].y += 1.0f;
 				// Convert from [0,2] to [0,screenWidth] and [0,screenHeight]
-				triProjected.p[i].x *= 0.5f * 960.0f;
-				triProjected.p[i].y *= 0.5f * 520.0f;
+				triProjected.p[i].x *= 0.5f * SCREEN_WIDTH;
+				triProjected.p[i].y *= 0.5f * SCREEN_HEIGHT;
 			}
 			m_console.drawTriangle(triProjected.p[0].x, triProjected.p[0].y, triProjected.p[1].x, triProjected.p[1].y, triProjected.p[2].x, triProjected.p[2].y, PIXEL_SOLID, FG_WHITE);
 		}
